@@ -51,6 +51,19 @@ Travel is cooked. Do not fake a pan on a still. Do not run `playbackRate` 2×+ t
 
 Playlist stitch uses first+last / `last_frame` hooks — the same continuity idea as boltverse-odyssey **cook-room** / **imagine-hooks**.
 
+### Plate 2 cook
+
+Continues from **plate 1 last frame** (first+last / `last_frame`). Same sprint speed. Same rails: **ZERO** path, **ZERO** Bolt.
+
+**Reveal:** futuristic city begins to emerge from haze — distant domes / spires / neon. Keep a **CLEAR** center corridor (playable lane stays empty).
+
+| Keep | Drop |
+|------|------|
+| Stitch from plate 1 last frame | New establishing shot / cut |
+| Sprint travelling at plate 1 speed | Slow-down, still, or 2×+ rate |
+| City as far haze (domes / spires / neon) | City filling the corridor |
+| CLEAR center | Luminous path, Bolt, clutter in the lane |
+
 ## Bolt card
 
 **Plant**
@@ -73,7 +86,7 @@ One thing at a time.
 
 1. **KEEP** one fast empty plate
 2. Erase bad PathGen overlays
-3. Cook plate 2 from the last frame of plate 1 + stitch
+3. Cook plate 2 from the last frame of plate 1 + stitch — city from haze, sprint speed, CLEAR center, zero path, zero Bolt
 4. Later: Imagine PathGen assets, then obstacles
 
 ## Anti-patterns
