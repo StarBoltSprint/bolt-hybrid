@@ -51,3 +51,8 @@ Unreal   →  dessin (mesh, cam boom, volumes, PCG)
 Browser proto: Imagine paints ; SprintCore decides ; Three.js draws. Unreal is out of the playable path.
 
 Pas de secrets. Pas d’API keys. Directeur-first.
+
+## Biome 2.5D playable (`biome-25d`)
+
+Runnable Vite app in [`play/`](play/). `cd play && npm i && npm run dev`.
+Plates: `play/public/biomes/asteroid/films/`. Bolt card: `play/public/hybrid/run/`.

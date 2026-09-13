@@ -1,0 +1,15 @@
+{
+  "plateId": "asteroid-run-0",
+  "file": "films/asteroid-run-0.mp4",
+  "duration": 15.04,
+  "railsVersion": "lockoff-back-v1",
+  "cues": [
+    {
+      "id": "c0",
+      "kind": "tap",
+      "side": "L",
+      "on": 4.5,
+      "off": 9.5
+    }
+  ]
+}
