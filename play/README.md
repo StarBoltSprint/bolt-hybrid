@@ -17,6 +17,10 @@ Open the printed localhost URL. Sprint starts immediately (no hall gates).
 - Tap left / A / ← : lane L
 - Tap right / D / → : lane R
 - Tap top / W / Space : hop
+- P : pause — freezes plate + gait + hop
+- H : howl — does **not** pause the plate
+
+Gait frames advance from `video.currentTime` delta (clamped). Contact shadow is soft Multiply over the plate so the path glow stays readable. Paw line is pinned to the plate ground line.
 
 ## Layout
 

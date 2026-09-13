@@ -18,6 +18,19 @@ type Lane = "L" | "C" | "R";
 const GAIT_N = 16;
 const GAIT_W = 208;
 const GAIT_H = 595;
+/** Flipbook frames per 1s of plate film (not wall clock). */
+const GAIT_PER_FILM_S = 10;
+/** Ignore currentTime jumps from plate swaps / seeks. */
+const FILM_DT_SPIKE = 0.08;
+/** Plate Y of the near-field ground line (was 0.89 — buried tips). */
+const GROUND_N = 0.858;
+/**
+ * Opaque paw line in the run strip (35px pad / 1190 ≈ 0.970).
+ * Extra lift so the plate never eats anti-aliased tips.
+ */
+const PAW_N = 0.97;
+const CONTACT_LIFT = 0.028;
+const JUMP_S = 0.46;
 const GAIT_URLS = Array.from(
   { length: GAIT_N },
   (_, i) => `/hybrid/run/${String(i + 1).padStart(2, "0")}.png?v=5`,
@@ -87,11 +100,14 @@ export function Hall() {
   const sprintIRef = useRef(0);
   const hitRef = useRef(false);
   const laneRef = useRef(0);
-  const jumpUntilRef = useRef(0);
+  const jumpLeftRef = useRef(0);
   const strafeUntilRef = useRef(0);
   const plateSpeedRef = useRef(0);
   const lastFilmTRef = useRef(-1);
   const lastWallRef = useRef(0);
+  const pausedRef = useRef(false);
+  const howlUntilRef = useRef(0);
+  const swayPhaseRef = useRef(0);
   const keysRef = useRef(new Set<string>());
   const ptrRef = useRef<{ x: number; y: number } | null>(null);
   const engineRef = useRef<ReturnType<typeof bootDom> | null>(null);
@@ -123,7 +139,9 @@ export function Hall() {
 
     const onDown = (e: KeyboardEvent) => {
       keysRef.current.add(e.code);
-      if (!sprintingRef.current) return;
+      if (e.code === "KeyP") togglePause();
+      if (e.code === "KeyH") howl();
+      if (!sprintingRef.current || pausedRef.current) return;
       if (e.code === "KeyA" || e.code === "ArrowLeft") setLane(-1);
       if (e.code === "KeyD" || e.code === "ArrowRight") setLane(1);
       if (e.code === "Space" || e.code === "KeyW" || e.code === "ArrowUp") hop();
@@ -138,8 +156,12 @@ export function Hall() {
     window.__controlsTest = {
       getYaw: () => -laneRef.current,
       getSpeed: () => (sprintingRef.current ? plateSpeedRef.current : 0),
+      getPaused: () => pausedRef.current,
       setKeys: (codes: string[]) => {
         keysRef.current = new Set(codes);
+        if (codes.includes("KeyP")) togglePause();
+        if (codes.includes("KeyH")) howl();
+        if (pausedRef.current) return;
         if (codes.includes("KeyA") || codes.includes("ArrowLeft")) setLane(-1);
         if (codes.includes("KeyD") || codes.includes("ArrowRight")) setLane(1);
         if (codes.includes("Space") || codes.includes("KeyW")) hop();
@@ -215,11 +237,12 @@ export function Hall() {
     if (!ctx) return false;
     ctx.clearRect(0, 0, GAIT_W, GAIT_H);
     const speed = plateSpeedRef.current;
-    const smear = speed > 0.85 ? Math.min(10, speed * 6) : 0;
+    const smear = speed > 0.85 ? Math.min(8, speed * 5) : 0;
     smearRef.current = smear;
     if (smear > 0.5) {
-      ctx.globalAlpha = 0.32;
-      ctx.drawImage(img, 0, smear, GAIT_W, GAIT_H);
+      ctx.globalAlpha = 0.28;
+      // Trail toward the horizon — never smear paws down into the plate.
+      ctx.drawImage(img, 0, -smear, GAIT_W, GAIT_H);
       ctx.globalAlpha = 1;
     }
     ctx.drawImage(img, 0, 0, GAIT_W, GAIT_H);
@@ -246,10 +269,11 @@ export function Hall() {
     const lane = laneRef.current;
     const nx = lane < 0 ? 0.28 : lane > 0 ? 0.72 : 0.5;
     const now = performance.now();
+    const left = jumpLeftRef.current;
     let hop = 0;
-    if (now < jumpUntilRef.current) {
-      const p = 1 - (jumpUntilRef.current - now) / 460;
-      hop = p < 0.38 ? -14 * (p / 0.38) : -14 * (1 - (p - 0.38) / 0.62);
+    if (left > 0) {
+      const p = 1 - left / JUMP_S;
+      hop = p < 0.38 ? -16 * (p / 0.38) : -16 * (1 - (p - 0.38) / 0.62);
     }
     const turning = Math.abs(lane) > 0;
     const yaw = lane * -32;
@@ -257,30 +281,34 @@ export function Hall() {
     const skew = lane * 10;
     const squashX = turning ? 0.88 : 1;
     const squashY = turning ? 1.06 : 1;
-    const sway = turning ? 0 : Math.sin(now / 430) * 2.6;
+    const sway = turning ? 0 : Math.sin(swayPhaseRef.current * (1000 / 430)) * 2.6;
     const w = Math.min(164, box.w * 0.21);
-    const far = Math.min(1, Math.abs(hop) / 14);
     const t = tintRef.current;
     const lum = (t.r + t.g + t.b) / 765;
     const feetX = box.left + box.w * nx;
-    const feetY = box.top + box.h * 0.89;
+    const feetY = box.top + box.h * GROUND_N;
+    const contact = (PAW_N - CONTACT_LIFT) * 100;
+    const howling = now < howlUntilRef.current;
     el.style.opacity = live ? "1" : "0";
     el.style.width = `${w}px`;
     el.style.left = `${feetX}px`;
     el.style.top = `${feetY}px`;
-    el.style.filter = `brightness(${0.52 + lum * 0.58})`;
+    el.style.transformOrigin = "50% 96%";
+    el.style.filter = `brightness(${0.52 + lum * 0.58 + (howling ? 0.08 : 0)})`;
     el.style.transform =
-      `translate3d(-50%, calc(-100% + ${hop}%), 0)` +
+      `translate3d(-50%, calc(-${contact}% + ${hop}px), 0)` +
       ` rotateY(${yaw}deg) rotateZ(${bank + sway}deg) skewX(${skew}deg)` +
       ` scale(${squashX}, ${squashY})`;
     if (sh) {
+      const air = Math.min(1, Math.abs(hop) / 16);
       sh.style.mixBlendMode = "multiply";
-      sh.style.opacity = live ? "0.3" : "0";
-      sh.style.width = `${Math.max(36, w * 0.52)}px`;
-      sh.style.height = `${Math.max(8, w * 0.1)}px`;
+      sh.style.filter = "none";
+      sh.style.opacity = live ? String(0.18 * (1 - air * 0.55)) : "0";
+      sh.style.width = `${Math.max(52, w * 0.78)}px`;
+      sh.style.height = `${Math.max(16, w * 0.2)}px`;
       sh.style.left = `${feetX}px`;
       sh.style.top = `${feetY}px`;
-      sh.style.transform = "translate(-50%, -40%)";
+      sh.style.transform = `translate(-50%, -30%) scale(${1 - air * 0.28}, 1)`;
     }
   }
 
@@ -294,28 +322,40 @@ export function Hall() {
     }
     const a = videoARef.current;
     const b = videoBRef.current;
-    const playingOf = (v: HTMLVideoElement | null) =>
-      !!v && !v.paused && !v.ended && Number.parseFloat(v.style.opacity || "0") > 0.2;
-    const v = playingOf(a) ? a : playingOf(b) ? b : visVideo(a, b);
+    const liveOf = (v: HTMLVideoElement | null) =>
+      !!v && !v.ended && Number.parseFloat(v.style.opacity || "0") > 0.2;
+    const v = liveOf(a) ? a : liveOf(b) ? b : visVideo(a, b);
+    const platePaused = pausedRef.current || !v || v.paused || v.ended;
     const filmT = v?.currentTime ?? 0;
     const wallDt = lastWallRef.current ? (now - lastWallRef.current) / 1000 : 0;
-    const filmDt = lastFilmTRef.current >= 0 ? filmT - lastFilmTRef.current : 0;
+    const rawFilmDt = lastFilmTRef.current >= 0 ? filmT - lastFilmTRef.current : 0;
     lastWallRef.current = now;
     lastFilmTRef.current = filmT;
 
+    // Gait + hop advance on clamped film dt only. Pause → filmDt 0 → freeze.
+    // Howl does not pause the plate, so filmDt keeps flowing.
+    let filmDt = 0;
+    if (!platePaused && rawFilmDt >= 0 && rawFilmDt <= FILM_DT_SPIKE) {
+      filmDt = rawFilmDt;
+    }
+
     let plateSpeed = 0;
-    if (v && !v.paused && !v.ended && wallDt > 0.001 && filmDt >= 0) {
-      plateSpeed = filmDt / wallDt;
+    if (!platePaused && wallDt > 0.001 && filmDt > 0) {
+      plateSpeed = Math.min(2.2, filmDt / wallDt);
     }
     if (plateSpeed < 0.08) plateSpeed = 0;
     plateSpeedRef.current = plateSpeed;
     samplePlate(v);
-    const scroll = plateSpeed * motionRef.current;
-    if (scroll > 0.08) {
-      gaitAccRef.current += wallDt * (10 * scroll);
+
+    if (filmDt > 0) {
+      swayPhaseRef.current += filmDt;
+      gaitAccRef.current += filmDt * GAIT_PER_FILM_S;
       while (gaitAccRef.current >= 1) {
         gaitIRef.current = (gaitIRef.current + 1) % GAIT_N;
         gaitAccRef.current -= 1;
+      }
+      if (jumpLeftRef.current > 0) {
+        jumpLeftRef.current = Math.max(0, jumpLeftRef.current - filmDt);
       }
     }
     drawGait(gaitIRef.current);
@@ -330,10 +370,37 @@ export function Hall() {
   }
 
   function hop() {
-    if (!sprintingRef.current) return;
-    jumpUntilRef.current = performance.now() + 460;
+    if (!sprintingRef.current || pausedRef.current) return;
+    jumpLeftRef.current = JUMP_S;
     paintBolt();
-    window.setTimeout(paintBolt, 480);
+  }
+
+  function togglePause() {
+    if (!sprintingRef.current) return;
+    pausedRef.current = !pausedRef.current;
+    const live = (v: HTMLVideoElement | null) =>
+      !!v && Number.parseFloat(v.style.opacity || "0") > 0.15;
+    for (const v of [videoARef.current, videoBRef.current]) {
+      if (!v) continue;
+      if (pausedRef.current) {
+        try {
+          v.pause();
+        } catch {
+          /* */
+        }
+      } else if (live(v) && !v.ended) {
+        void v.play().catch(() => {});
+      }
+    }
+    lastFilmTRef.current = -1;
+    lastWallRef.current = 0;
+    paintBolt();
+  }
+
+  function howl() {
+    // Howl must not stop the plate — no pause(), no playbackRate change.
+    howlUntilRef.current = performance.now() + 880;
+    paintBolt();
   }
 
   function hideCues() {
@@ -419,6 +486,7 @@ export function Hall() {
       laneRef.current = 0;
       gaitIRef.current = 0;
       gaitAccRef.current = 0;
+      pausedRef.current = false;
     }
     lastFilmTRef.current = -1;
     lastWallRef.current = 0;
@@ -446,6 +514,7 @@ export function Hall() {
     if (!stage || !engine) return;
 
     if (sprintingRef.current) {
+      if (pausedRef.current) return;
       const hit = plateHit(stage, e.clientX, e.clientY);
       if (!hit) return;
       ptrRef.current = { x: e.clientX, y: e.clientY };
@@ -479,7 +548,7 @@ export function Hall() {
   }
 
   function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (!sprintingRef.current || !ptrRef.current) {
+    if (!sprintingRef.current || !ptrRef.current || pausedRef.current) {
       ptrRef.current = null;
       return;
     }
@@ -556,6 +625,7 @@ declare global {
     __controlsTest?: {
       getYaw: () => number;
       getSpeed: () => number;
+      getPaused?: () => boolean;
       setKeys?: (codes: string[]) => void;
     };
   }
