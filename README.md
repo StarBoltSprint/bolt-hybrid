@@ -29,6 +29,7 @@ How to run, controls, and how to add `Obstacle` rows: [`game/README.md`](game/RE
 | [04-unreal-pipeline](docs/04-unreal-pipeline.md) | fixedUpdate → pose → cam ; Media ; anti-CMC |
 | [05-controls](docs/05-controls.md) | Rail CLEAR, Howl, heightfield roam |
 | [06-proto-status](docs/06-proto-status.md) | Three.js : ce qui tourne / ce qui manque |
+| [07-imagine-25d-recipe](docs/07-imagine-25d-recipe.md) | Imagine-only 2.5D biome sprint (plates + card; no Unreal) |
 | [anti-patterns](docs/anti-patterns.md) | Pièges à ne pas reproduire |
 
 ## Status
@@ -56,3 +57,4 @@ Pas de secrets. Pas d’API keys. Directeur-first.
 
 Runnable Vite app in [`play/`](play/). `cd play && npm i && npm run dev`.
 Plates: `play/public/biomes/asteroid/films/`. Bolt card: `play/public/hybrid/run/`.
+Recipe (Imagine-only, not Unreal / not mesh-first): [`docs/07-imagine-25d-recipe.md`](docs/07-imagine-25d-recipe.md).
