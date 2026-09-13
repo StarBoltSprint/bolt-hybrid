@@ -5,6 +5,19 @@
 Bible publique d’architecture pour **Bolt Hybrid** / **SprintCore** / **Unreal** / **Grok Imagine**.  
 Lock architecture. Proto Three.js existant. Scaffold UE : TBD.
 
+## Playable proto (browser)
+
+The Three.js + SprintCore hybrid is in [`game/`](game/). Imagine plates are the world. KEEP `bolt.glb` is the pawn. Hall = calm roam. Biome = sprint + dodge volumes.
+
+```bash
+cd game
+npm i
+npm run dev
+```
+
+Live: https://olive-lion-quartz-craft.grok.me  
+How to run, controls, and how to add `Obstacle` rows: [`game/README.md`](game/README.md)
+
 ## Quick start — carte des docs
 
 | Doc | Contenu |
@@ -23,9 +36,9 @@ Lock architecture. Proto Three.js existant. Scaffold UE : TBD.
 | Item | État |
 |------|------|
 | Architecture | **LOCK** |
-| Proto Three.js (`bolt-hybrid`) | Existe (SprintCore + hall + doors + sky hash) |
+| Proto Three.js (`game/`) | **Playable** — SprintCore + Imagine hall + KEEP mesh + biome dodge volumes |
 | UE scaffold | **TBD** |
-| Obstacle track / VideoTexture / plate timeline | Missing (cubes first → Imagine clips) |
+| Obstacle track | **Proto shipped** (invisible `{x,z,r,kind,beat}` in biome; hall = none) |
 
 ## Stack mental model
 
@@ -34,5 +47,7 @@ Imagine  →  décor (MediaTexture, sky, ribbon, relics)
 SprintCore →  décision (pats, m, w, integrator 1/60)
 Unreal   →  dessin (mesh, cam boom, volumes, PCG)
 ```
+
+Browser proto: Imagine paints ; SprintCore decides ; Three.js draws. Unreal is out of the playable path.
 
 Pas de secrets. Pas d’API keys. Directeur-first.
