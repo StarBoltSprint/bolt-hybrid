@@ -57,4 +57,5 @@ Pas de secrets. Pas d’API keys. Directeur-first.
 
 Runnable Vite app in [`play/`](play/). `cd play && npm i && npm run dev`.
 Plates: `play/public/biomes/asteroid/films/`. Bolt card: `play/public/hybrid/run/`.
+Live `rate(t)` + tint (0.1 s stack): [`play/README.md`](play/README.md) — `playlist.json` `rateCurve` drives `playbackRate`; soft Multiply wrap keeps the white coat.
 Recipe (Imagine-only, not Unreal / not mesh-first): [`docs/07-imagine-25d-recipe.md`](docs/07-imagine-25d-recipe.md).

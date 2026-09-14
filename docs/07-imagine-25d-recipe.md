@@ -45,7 +45,7 @@ Hall / Citadel stays **film / hall grammar**. This recipe does not apply there.
 | Path | **ZERO** luminous path in the plate |
 | Cast | **ZERO** Bolt / dog in the plate |
 | Stitch | plate N+1 **first frame = plate N last frame** |
-| Rate | `playbackRate` ~1.0–1.2 only after a fast cook |
+| Rate | Cook travelling in-clip. Player applies live `rate(t)` from `playlist.json` `rateCurve` (1.0–1.6, ≥10 Hz). A constant `playbackRate` is summary only. |
 
 Travel is cooked. Do not fake a pan on a still. Do not run `playbackRate` 2×+ to fake speed.
 
@@ -70,8 +70,9 @@ Continues from **plate 1 last frame** (first+last / `last_frame`). Same sprint s
 
 - Pivot at paws / `groundY`
 - Strafe **X only**
-- Stride from `pictureTime` (plate clock, not a free gait clock)
+- Stride from `pictureTime` + live `rate(t)` (plate clock, not a free gait clock, not legs-only)
 - Soft contact shadow under the paws
+- Ambient tint every **~0.1 s** — soft Multiply + identityGuard (full-white coat)
 
 **Skating** = the card is not planted. That is a plant bug. It is not “Imagine bad paws.”
 
@@ -112,3 +113,5 @@ Reject in review.
 Run the biome app: `cd play && npm i && npm run dev`.
 
 Plates: `play/public/biomes/asteroid/films/`. Bolt card: `play/public/hybrid/run/`. Vis/hid stitch: `play/src/dom-swap.ts`.
+
+**Playlist rateCurve + tint:** drop odyssey analyze `playlist.json` next to the films (`play/public/biomes/asteroid/playlist.json`). `play/` reads `plates[].rateCurve` and drives `video.playbackRate` live from `pictureTime` every frame / ~0.1 s. Tint samples lower-third ground+haze at the same 0.1 s cadence (`src/biome-25d-speed.ts`). See [`play/README.md`](../play/README.md).

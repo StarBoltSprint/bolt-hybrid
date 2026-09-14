@@ -1,4 +1,13 @@
 import { useEffect, useRef } from "react";
+import {
+  applyLiveRate,
+  applyLiveTint,
+  rateAt,
+  TINT_AMOUNT_DEFAULT,
+  TINT_DT,
+  WHITE_CARD,
+  wrapFill,
+} from "./biome-25d-speed";
 import { bootDom, DISSOLVE_MS } from "./dom-swap";
 import {
   breathFor,
@@ -12,6 +21,7 @@ import {
   type Pose,
   type Tap,
 } from "./pack";
+import { loadPlaylist, plateAt, type Playlist } from "./playlist";
 
 type Lane = "L" | "C" | "R";
 
@@ -85,10 +95,11 @@ export function Hall() {
   const gradeRef = useRef<HTMLDivElement>(null);
   const boltRef = useRef<HTMLCanvasElement>(null);
   const shadowRef = useRef<HTMLDivElement>(null);
-  const tintRef = useRef({ r: 196, g: 132, b: 84 });
+  const tintRef = useRef({ r: WHITE_CARD.r, g: WHITE_CARD.g, b: WHITE_CARD.b, pulled: false, luma: 250 });
   const sampleRef = useRef<HTMLCanvasElement | null>(null);
-  const prevPixRef = useRef<Uint8ClampedArray | null>(null);
-  const motionRef = useRef(0);
+  const playlistRef = useRef<Playlist | null>(null);
+  const liveRateRef = useRef(1);
+  const lastTintAtRef = useRef(0);
   const smearRef = useRef(0);
   const gaitImgsRef = useRef<HTMLImageElement[]>([]);
   const gaitIRef = useRef(0);
@@ -156,6 +167,9 @@ export function Hall() {
     window.__controlsTest = {
       getYaw: () => -laneRef.current,
       getSpeed: () => (sprintingRef.current ? plateSpeedRef.current : 0),
+      getRate: () => liveRateRef.current,
+      getPictureTime: () => lastFilmTRef.current,
+      getTint: () => tintRef.current,
       getPaused: () => pausedRef.current,
       setKeys: (codes: string[]) => {
         keysRef.current = new Set(codes);
@@ -168,7 +182,10 @@ export function Hall() {
       },
     };
 
-    playSprintRef.current(0);
+    void loadPlaylist().then((pl) => {
+      playlistRef.current = pl;
+      playSprintRef.current(0);
+    });
 
     return () => {
       cancelAnimationFrame(rafRef.current);
@@ -180,52 +197,36 @@ export function Hall() {
     };
   }, []);
 
-  function samplePlate(v: HTMLVideoElement | null) {
+  /** Lower-third ground + haze under Bolt → softMultiply + identityGuard. */
+  function samplePlateTint(v: HTMLVideoElement | null) {
     const s = sampleRef.current;
     if (!s || !v || v.readyState < 2 || v.videoWidth < 2) return;
     const ctx = s.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
     const vw = v.videoWidth;
     const vh = v.videoHeight;
+    const lane = laneRef.current;
+    const nx = lane < 0 ? 0.28 : lane > 0 ? 0.72 : 0.5;
+    const bw = 0.28;
+    const x0 = Math.min(1 - bw, Math.max(0, nx - bw / 2));
     try {
-      ctx.drawImage(v, vw * 0.22, vh * 0.52, vw * 0.56, vh * 0.4, 0, 0, 12, 12);
+      // Same band as odyssey travel/tint crop: y=0.74, h=0.18 (ground + haze).
+      ctx.drawImage(v, vw * x0, vh * 0.74, vw * bw, vh * 0.18, 0, 0, 12, 12);
       const img = ctx.getImageData(0, 0, 12, 12);
       const d = img.data;
       let r = 0,
         g = 0,
-        b = 0,
-        mad = 0;
-      const prev = prevPixRef.current;
+        b = 0;
+      const n = d.length / 4;
       for (let i = 0; i < d.length; i += 4) {
         r += d[i];
         g += d[i + 1];
         b += d[i + 2];
-        if (prev) {
-          mad +=
-            Math.abs(d[i] - prev[i]) +
-            Math.abs(d[i + 1] - prev[i + 1]) +
-            Math.abs(d[i + 2] - prev[i + 2]);
-        }
       }
-      prevPixRef.current = new Uint8ClampedArray(d);
-      const n = d.length / 4;
-      const t = tintRef.current;
-      t.r += (r / n - t.r) * 0.45;
-      t.g += (g / n - t.g) * 0.45;
-      t.b += (b / n - t.b) * 0.45;
-      if (prev) motionRef.current = Math.min(1, mad / n / 90);
+      const wrap = applyLiveTint(WHITE_CARD, { r: r / n, g: g / n, b: b / n }, TINT_AMOUNT_DEFAULT);
+      tintRef.current = wrap;
     } catch {
-      const pal = [
-        { r: 205, g: 138, b: 78 },
-        { r: 188, g: 122, b: 72 },
-        { r: 88, g: 108, b: 138 },
-        { r: 46, g: 64, b: 102 },
-      ][sprintIRef.current] ?? { r: 120, g: 100, b: 90 };
-      const t = tintRef.current;
-      t.r += (pal.r - t.r) * 0.35;
-      t.g += (pal.g - t.g) * 0.35;
-      t.b += (pal.b - t.b) * 0.35;
-      motionRef.current = 0;
+      // Keep last wrap — identity stays the white coat.
     }
   }
 
@@ -246,15 +247,10 @@ export function Hall() {
       ctx.globalAlpha = 1;
     }
     ctx.drawImage(img, 0, 0, GAIT_W, GAIT_H);
-    const t = tintRef.current;
-    const lum = (t.r + t.g + t.b) / 765;
-    ctx.globalCompositeOperation = "source-atop";
-    ctx.fillStyle = `rgba(${t.r | 0},${t.g | 0},${t.b | 0},0.52)`;
+    const fill = wrapFill(tintRef.current);
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = `rgb(${fill.r | 0},${fill.g | 0},${fill.b | 0})`;
     ctx.fillRect(0, 0, GAIT_W, GAIT_H);
-    if (lum < 0.42) {
-      ctx.fillStyle = `rgba(8,18,40,${0.38 - lum * 0.4})`;
-      ctx.fillRect(0, 0, GAIT_W, GAIT_H);
-    }
     ctx.globalCompositeOperation = "source-over";
     return true;
   }
@@ -283,8 +279,6 @@ export function Hall() {
     const squashY = turning ? 1.06 : 1;
     const sway = turning ? 0 : Math.sin(swayPhaseRef.current * (1000 / 430)) * 2.6;
     const w = Math.min(164, box.w * 0.21);
-    const t = tintRef.current;
-    const lum = (t.r + t.g + t.b) / 765;
     const feetX = box.left + box.w * nx;
     const feetY = box.top + box.h * GROUND_N;
     const contact = (PAW_N - CONTACT_LIFT) * 100;
@@ -294,7 +288,8 @@ export function Hall() {
     el.style.left = `${feetX}px`;
     el.style.top = `${feetY}px`;
     el.style.transformOrigin = "50% 96%";
-    el.style.filter = `brightness(${0.52 + lum * 0.58 + (howling ? 0.08 : 0)})`;
+    // Coat stays white — wrap is canvas multiply, not a dimming filter.
+    el.style.filter = howling ? "brightness(1.08)" : "none";
     el.style.transform =
       `translate3d(-50%, calc(-${contact}% + ${hop}px), 0)` +
       ` rotateY(${yaw}deg) rotateZ(${bank + sway}deg) skewX(${skew}deg)` +
@@ -325,6 +320,11 @@ export function Hall() {
     const liveOf = (v: HTMLVideoElement | null) =>
       !!v && !v.ended && Number.parseFloat(v.style.opacity || "0") > 0.2;
     const v = liveOf(a) ? a : liveOf(b) ? b : visVideo(a, b);
+    const plate = plateAt(playlistRef.current, sprintIRef.current);
+    if (v) {
+      const live = applyLiveRate(v, plate.rateCurve);
+      liveRateRef.current = live.rate;
+    }
     const platePaused = pausedRef.current || !v || v.paused || v.ended;
     const filmT = v?.currentTime ?? 0;
     const wallDt = lastWallRef.current ? (now - lastWallRef.current) / 1000 : 0;
@@ -345,7 +345,10 @@ export function Hall() {
     }
     if (plateSpeed < 0.08) plateSpeed = 0;
     plateSpeedRef.current = plateSpeed;
-    samplePlate(v);
+    if (!platePaused && now - lastTintAtRef.current >= TINT_DT * 1000) {
+      lastTintAtRef.current = now;
+      samplePlateTint(v);
+    }
 
     if (filmDt > 0) {
       swayPhaseRef.current += filmDt;
@@ -490,6 +493,9 @@ export function Hall() {
     }
     lastFilmTRef.current = -1;
     lastWallRef.current = 0;
+    lastTintAtRef.current = 0;
+    const plate = plateAt(playlistRef.current, i);
+    liveRateRef.current = rateAt(plate.rateCurve, 0);
     paintBolt();
     drawGait(gaitIRef.current);
     cancelAnimationFrame(rafRef.current);
@@ -500,6 +506,7 @@ export function Hall() {
       src: sprintFilms[i],
       loop: false,
       fadeMs: i === 0 ? 0 : DISSOLVE_MS,
+      rate: liveRateRef.current,
       onEnded: () => {
         if (!sprintingRef.current) return;
         playSprint(i + 1);
@@ -625,6 +632,9 @@ declare global {
     __controlsTest?: {
       getYaw: () => number;
       getSpeed: () => number;
+      getRate?: () => number;
+      getPictureTime?: () => number;
+      getTint?: () => { r: number; g: number; b: number; pulled?: boolean; luma?: number };
       getPaused?: () => boolean;
       setKeys?: (codes: string[]) => void;
     };

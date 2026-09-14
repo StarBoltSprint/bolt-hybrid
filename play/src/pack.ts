@@ -1,8 +1,9 @@
-export const PACK = 36;
+export const PACK = 37;
 export const DISSOLVE_MS = 280;
 
 const ROOT = "/packs/mars";
-const BIOME = "/biomes/asteroid";
+export const BIOME = "/biomes/asteroid";
+export const PLAYLIST_URL = `${BIOME}/playlist.json?u${PACK}`;
 
 export function packUrl(rel: string) {
   return `${ROOT}/${rel}?u${PACK}`;

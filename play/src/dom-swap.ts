@@ -67,12 +67,15 @@ export function bootDom({
     still: stillSrc,
     loop = false,
     fadeMs = 0,
+    rate,
     onEnded,
   }: {
     src: string;
     still?: string;
     loop?: boolean;
     fadeMs?: number;
+    /** Initial playbackRate; play loop overwrites live from rateCurve ≥10Hz. */
+    rate?: number;
     onEnded?: () => void;
   }) {
     const myGen = ++gen;
@@ -86,7 +89,7 @@ export function bootDom({
     hid.setAttribute("playsinline", "true");
     hid.setAttribute("webkit-playsinline", "true");
     hid.loop = !!loop;
-    hid.playbackRate = 1;
+    hid.playbackRate = Number(rate) > 0 ? Number(rate) : 1;
     hid.src = src;
     try {
       hid.currentTime = 0;
