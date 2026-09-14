@@ -508,7 +508,7 @@ export function Hall() {
       fadeMs: i === 0 ? 0 : DISSOLVE_MS,
       rate: liveRateRef.current,
       onEnded: () => {
-        if (!sprintingRef.current) return;
+        if (!sprintingRef.current || pausedRef.current) return;
         playSprint(i + 1);
       },
     });
