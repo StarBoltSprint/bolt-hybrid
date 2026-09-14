@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite --host --port 5173",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host --port 5173"
+    "preview": "vite preview --host --port 5173",
+    "test": "node --experimental-strip-types --no-warnings src/biome-25d-speed.selftest.ts"
   },
   "dependencies": {
     "react": "^19.2.0",
